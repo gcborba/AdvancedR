@@ -1,0 +1,94 @@
+---
+title: "Benchmark exercise"
+author: "Abby Lewis"
+date: "2023-08-11"
+output: html_document
+---
+
+# Warm-up exercise
+
+Working individually, brainstorm two ways to calculate the mean of each column of this example data frame. Try to use a for loop for at least one of your options.
+
+```{r test-matrix}
+set.seed(47)
+m <- data.frame(matrix(runif(1E5, max = 100), ncol = 100))
+
+
+
+#Structure of a function:
+#function(inputs){
+# CODE HERE
+#}
+
+#Structure of a for loop:
+#initialize output vector if needed
+#for(index in 1:range){
+# CODE HERE
+#}
+```
+
+As a class, implement several options as functions. Make predictions as to which options will be fastest and why
+
+```{r}
+# OPTION 1: for loop with initialized output vector
+loop_replace <- function(m) {
+  means <- numeric(ncol(m)) #initialize output vector
+  for (i in 1:ncol(m)) { #loop through indices 
+    means[i] <- mean(m[[i]]) #calculate mean and put in output vector
+  }
+  means #return the now-complete output vector
+}
+
+# OPTION 2: built-in colMeans function
+built_in <- function(m) {
+  means <- colMeans(m) #built in function in R
+  unname(means)
+}
+
+# OPTION 3: for loop that sequentially adds
+loop_build <- function(m) {
+  means <- c() #initialize empty output vector
+  for (i in 1:ncol(m)) { #loop through indices 
+    means <- c(means, mean(m[[i]])) #calculate mean and add to output vector
+  }
+  means #return the now-complete output vector
+}
+
+# OPTION 4: tidyverse
+library(tidyverse) #load package
+tidy <- function(m) {
+  means <- m %>% #use pipe to pass the dataframe to the function
+    summarize_all(mean) #use summarize_all function to calculate the mean of all columns
+  as.numeric(means) #convert from data frame to vector
+}
+
+Check if outputs are the same with all approaches
+
+
+identical(loop_replace(m),
+          built_in(m),
+          loop_build(m),
+          tidy(m))
+# TRUE indicates all are the same—these four approaches return the same output
+```
+
+
+Use the `microbenchmark` package to compare the speed of these options
+
+```{r}
+library(microbenchmark)
+compare <- microbenchmark(loop_replace(m),
+                          built_in(m),
+                          loop_build(m),
+                          tidy(m),
+                          times = 100
+                          )
+ggplot2::autoplot(compare)
+```
+
+## Discussion questions
+
+* What factors make these approaches more and less efficient? 
+* Do you expect the same patterns with larger datasets? Smaller datasets?
+* In your own work, have there been times where code efficiency was a concern? If so, what have you done to address this concern?
+* Aside from efficiency, what factors may make some of these options better than others?
