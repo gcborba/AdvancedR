@@ -1,0 +1,59 @@
+---
+title: "02_Functions"
+author: "Abby Lewis"
+date: "2023-09-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Function calls
+
+Here's a simple example of a function to illustrate how memory operates similarly inside and outside of functions:
+
+```{r functions}
+f <- function(a) {
+  a
+}
+
+x <- c(1, 2, 3)
+cat(tracemem(x), "\n")
+
+z <- f(x)
+# there's no copy here!
+
+untracemem(x)
+```
+
+While `f()` is running, the `a` inside the function points to the same value as the `x` does outside the function:
+
+```{r, echo = FALSE, out.width = NULL}
+knitr::include_graphics("../diagrams/name-value/binding-f1.png")
+```
+
+The function `f()` is depicted by the yellow object on the right. It has a formal argument, `a`, which becomes a binding (indicated by dotted black line) in the execution environment (the gray box) when the function is run.
+
+Once `f()` completes, `x` and `z` will point to the same object. 
+
+```{r, echo = FALSE, out.width = NULL}
+knitr::include_graphics("../diagrams/name-value/binding-f2.png")
+```
+
+The object never gets copied because it never gets modified. If `f()` did modify `x`, R would create a new copy, and then `z` would bind that object.
+
+```{r functions2}
+f <- function(a) {
+  a[[1]] <- 2
+}
+
+x <- c(1, 2, 3)
+tracemem(x)
+
+z <- f(x)
+# x gets copied here
+
+untracemem(x)
+```
+
