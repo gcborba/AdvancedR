@@ -1,0 +1,178 @@
+---
+title: "03_Parallel"
+author: "Abby Lewis"
+date: "2023-10-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Parallel processing
+
+Parallel processing is a way of running code that distributes a task among multiple "cores" to make the calculation faster
+
+* A `core` is the part of the processor that actually performs the computation
+* A `cluster` is a collection of objects that are capable of hosting cores. This could range from your laptop to an array of servers on a high-performance computing network
+* A `process` is a single running version of R (or more generally any program). A single core can only run one process at a time
+
+##Map and apply functions
+
+Last week we discussed how the map functional `purrr::map()` takes a vector and a function, calls the function once for each element of the vector, and returns the results in a list. 
+
+```{r, echo = FALSE, out.width = NULL}
+knitr::include_graphics("../diagrams/functionals/map.png")
+```
+
+From the way we have drawn this diagram, you can see how this type of function can easily transfer to parallel processing. Each of the f() functions can be run on its own core, then combined back into a list as an output
+
+##Getting started in parallel
+
+There are lots of ways to implement parallel processing in R. We're going to use the version that translates most directly from `purrr::map()`, which we covered last week. The package `furrr` applies mapping functions in parallel using a concept called "futures"
+
+```{r}
+library(furrr)
+library(purrr)
+```
+
+Let's start with an example from the in-class exercises we did last week: 
+
+Use map() to fit linear models to the mtcars dataset using the formulas stored in this
+list:
+
+```{r}
+mtcars
+
+formulas <- list(
+  mpg ~ disp,
+  mpg ~ I(1 / disp),
+  mpg ~ disp + wt,
+  mpg ~ I(1 / disp) + wt)
+
+purrr::map(formulas, #first argument to function 
+           lm, #function 
+           data = mtcars#other arguments to pass to function
+           )
+```
+
+This actually runs quite quickly, so lets artificially slow things down to simulate a more computationally-intensive process
+
+```{r}
+lm_slow <- function(formula, data){
+  Sys.sleep(0.5) #Forces the system to wait for 0.5 seconds to simulate a computationally slow process
+  lm(formula, data) #Run model
+}
+
+test_1 <- purrr::map(formulas, lm_slow, data = mtcars)
+```
+
+We can instead run this in parallel using `furrr::future_map()`. The formulation is almost the same, but we need to first create a "plan" for how furrr functions should operate 
+
+```{r}
+#First, figure out how many cores you have available
+no_cores <- availableCores() - 1 #it is good practice to use one fewer than the number of cores you have
+plan(multisession, workers = no_cores)
+
+#Run task in parallel
+test_2 <- furrr::future_map(formulas, lm_slow, data = mtcars)
+
+#Confirm that results are identical
+identical(furrr::future_map(formulas, lm_slow, data = mtcars),
+                          purrr::map(formulas, lm_slow, data = mtcars))
+```
+
+Let's compare the speed of these approaches:
+
+```{r}
+#Load microbenchmark package
+library(microbenchmark)
+#Use microbenchmark package to compare how long each approach takes
+compare <- microbenchmark(furrr::future_map(formulas, lm_slow, data = mtcars),
+                          purrr::map(formulas, lm_slow, data = mtcars),
+                          times = 10
+                          )
+#Plot results
+ggplot2::autoplot(compare)
+```
+
+As you can see from the figure above, running the task in a serial/sequential workflow takes slightly more than 2 seconds, which makes sense because we made the code wait for 0.5 seconds four times
+
+The parallel version only takes ~0.55 seconds
+
+###But Abby I like `lapply()` better than `map()`
+
+We haven't covered `lapply()` in this class, but it is functionally _very_ similar to `map()` and exists in base R. The same workflow can be used to parallelize apply functions using the `future.apply` package
+
+```{r}
+library(future.apply)
+
+#Create plan
+no_cores <- availableCores() - 1
+plan(multisession, workers = no_cores)
+
+#Compare parallel vs non-parallel versions
+compare <- microbenchmark(future.apply::future_lapply(formulas, lm_slow, data = mtcars),
+                          lapply(formulas, lm_slow, data = mtcars),
+                          times = 10
+                          )
+
+#Plot results
+ggplot2::autoplot(compare)
+```
+
+###Why not do this with every task?
+
+There is some overhead associated with dividing the task between cores. You see this overhead if you run a simple process (i.e., lm() instead of lm_slow() in the example below)
+
+```{r}
+#Using lm instead of lm_slow
+compare <- microbenchmark(furrr::future_map(formulas, lm, data = mtcars),
+                          purrr::map(formulas, lm, data = mtcars),
+                          times = 10
+                          )
+
+#Plot results
+ggplot2::autoplot(compare)
+```
+What about memory use?
+
+```{r}
+library(profmem) #uses utils::Rprofmem
+gc()
+total(profmem(x <- furrr::future_map(formulas, lm_slow, data = mtcars)))
+total(profmem(x <- purrr::map(formulas, lm_slow, data = mtcars)))
+```
+
+##Behind the scenes and the history of parallel R
+
+Parallel processing in R can be implemented in two ways: through socketting and through forking. 
+
+* Forking works by cloning your entire R environment to each separate core. This is very efficient because you don't have to worry about reproducing your working environment in each parallel node. Everything is already linked, which means that you aren't duplicating objects in memory. However, forking is not supported on Windows and can also cause problems in an IDE or GUI like RStudio.
+
+* Parallel sockets (aka “PSOCKs”) work by launching a new R session in each core. This means that your master environment has to be copied over and instantiated separately in each parallel node. This requires greater overhead since objects will be duplicated across each core. But this approach can be implemented on every system, including Windows, and doesn't create problems for IDEs like RStudio.
+
+Historically, you had to manage these approaches yourself, but `furrr` and `future.apply` take care of this for you, as specified in you "plan"
+
+Above, we created a "plan" using the term "multisession" as a parallel option that runs on both Windows and Mac OS. 
+
+```{r}
+#plan(multisession, workers = no_cores)
+```
+
+Other options exist (see the documentation of `plan()` for more information):
+
+* sequential: this is a non-parallel way of running the code. If your plan is "sequential", `furrr::future_map()` will return the same output as `purrr::map()`
+
+* multisession: runs background R sessions (on current machine) using PSOCKs
+
+* multicore: runs forked R processes (on current machine). Not supported on Windows
+
+* cluster: uses external R sessions on current, local, and/or remote machines
+
+###For more information
+
+* Futures (the basis for the implementation of parallel processing, as described above): https://cran.r-project.org/web/packages/future/vignettes/future-1-overview.html
+
+* This tutuorial formed some of the basis for the development of the exercises and text above, and is another great resource https://grantmcdermott.com/ds4e/parallel.html
+

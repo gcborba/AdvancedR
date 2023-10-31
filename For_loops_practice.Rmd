@@ -1,0 +1,74 @@
+---
+title: "For loop practice"
+author: "Abby Lewis"
+date: "2023-09-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Several exercises for practicing for loops, primarily drawn from [R-bloggers](https://www.r-bloggers.com/2018/03/loops-in-r-exercises/)
+
+## Exercise 1
+
+Write a for loop that iterates over the numbers 1 to 7 and stores the cube of each number in `output`.
+
+```{r}
+#output <- ??? #how long do you want the output to be? Can you create a vector of that length?
+#for () { #what do you want to iterate over?
+  
+  #BODY
+
+#} end for loop
+#output #view output
+```
+
+seven <- c(1,2,3,4,5,6,7)
+for(i in 1:length(seven)) {}
+
+
+
+
+## Exercise 2
+
+Write a for loop that iterates over the column names of the inbuilt iris dataset and print each together with the number of characters in the column name in parenthesis. Example output: "Sepal.Length (12)". 
+Use the following functions print(), paste0() and nchar().
+
+```{r}
+iris
+?paste0()
+?nchar()
+```
+
+## Exercise 3
+
+Using a for loop simulate the flip a coin twenty times, keeping track of the individual outcomes (1 = heads, 0 = tails) in a vector that you preallocate.
+
+```{r}
+sample(c("heads","tails"),1)
+```
+
+## Exercise 4
+
+Use a nested for loop (a for loop inside a for loop) to produce the following matrix. Preallocate the matrix with NA values.
+    0     1     2     3     4
+    1     0     1     2     3
+    2     1     0     1     2
+    3     2     1     0     1
+    4     3     2     1     0
+    
+```{r}
+output <- matrix(NA, nrow = 5, ncol = 5) #Start with this matrix
+# For loop here
+```
+
+## Exercise 5
+
+The first two terms of the Fibonacci sequence are both ones. Subsequent terms of the sequence are found by summing the two terms immediately previous. Write a for loop that produces the first 10 terms of the Fibonacci sequence
+
+```{r}
+
+```
+

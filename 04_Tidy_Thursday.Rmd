@@ -1,0 +1,429 @@
+---
+title: "04_Tidy_Thursday"
+author: "Abby Lewis"
+date: "2023-10-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Tidyverse (Tidy Thursday)
+
+Welcome to the tidyverse! The tidyverse is a collection of packages for data science in R. All packages share an underlying design philosophy, grammar, and data structures. 
+
+They can all be loaded by running `library(tidyverse)`
+
+```{r}
+library(tidyverse)
+```
+
+To see all of the packages in the tidyverse you can use the function `tidyverse_packages()`. Some of these likely seem familiar (e.g., we have worked with purrr, and you may be familiar with ggplot), while others are more niche
+
+```{r}
+tidyverse_packages()
+```
+
+Each of these packages could also be loaded independently, but loading everything in the tidyverse gives you access to a comprehensive suite of data analysis tools
+
+## Getting started with syntax: the magrittr pipe operator
+
+One of the key features of tidyverse code is the magrittr pipe operator, %>%. The pipe operator functions by passing whatever is on the left hand side of the pipe to the first argument of the function call on the right. 
+
+(recall: what do we call this type of function?)
+
+For example:
+
+```{r}
+rep("hello", 4) 
+#could be re-written as 
+"hello" %>% rep(4)
+```
+
+You can also use a `.` to indicate where in the function (on the right) the input should go. For example:
+
+```{r}
+"hello" %>% rep(4)
+#is the same as
+"hello" %>% rep(., 4)
+
+#this returns an error because 4 is passed to the first argument of rep, pushing "hello" to the second argument
+4 %>% rep("hello")
+#instead you should write:
+4 %>% rep("hello", .)
+```
+
+Pipes can be chained together to create a cohesive workflow:
+
+```{r}
+#Non-pipe workflow:
+intermediate <- rep(1:10, 3)
+sum(intermediate)
+
+#Pipe
+1:10 %>% rep(3) %>% sum()
+#Orienting vertically makes workflow especially clear
+```
+
+The pipe operator now also exists in base R, where it is written `|>`. The same concepts apply.
+
+## Tidyverse verbs
+
+There are several key functions that will often show up in a tidyverse workflow:
+* `filter()`: subset rows of data
+* `select()`: subset columns of data
+* `rename()`: rename a column of data
+* `mutate()`: add or modify a column of data
+* `summarize()`: calculate summary statistics
+* `arrange()`: sort data based on specified 
+* `group_by()`: used with summarize and mutate to run calculations within "groups" of data
+* `pivot_longer()` and `pivot_wider()`: increase or decrease the number of columns/rows of data
+
+To demonstrate, we need an example dataset.
+
+We're going to use "Tidy Tuesday" dataset of the week (https://github.com/rfordatascience/tidytuesday)—Taylor Swift.
+
+### Tidy Tuesday: taylor's version
+
+```{r}
+#install.packages("taylor")
+library(taylor)
+```
+
+There are three main data sets. 
+
+* `taylor_album_songs` includes all songs from her albums
+* `taylor_all_songs` includes all of the songs in taylor_album_songs plus EPs, individual singles, and the original versions of albums that have been re-released as Taylor’s Version
+* `taylor_albums` summarizes Taylor’s album release history
+
+More information here: https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-10-17/readme.md
+
+```{r}
+taylor_album_songs
+```
+
+### `filter()`
+
+Say we only wanted the songs with featured artists. We could use `filter()` to identify those rows in the dataset
+
+```{r}
+taylor_album_songs %>%
+  filter(!is.na(featuring))
+
+#Remember that this is the same as writing
+filter(taylor_album_songs, !is.na(featuring))
+```
+
+### `select()`
+
+The dataset above is still somewhat hard to view because there are 29 columns of data. Let's look at just album_name, featuring, duration, and Spotify's "acousticness" metric (1.0 represents high confidence the track is acoustic)
+
+```{r}
+taylor_album_songs %>%
+  filter(!is.na(featuring)) %>%
+  select(album_name, featuring, duration_ms, acousticness)
+```
+
+You can see from this example how the tidy verbs work nicely together, walking through a data analysis workflow. That is, it is clear that your first step was to filter to only tracks with featured artists, and your second step was to select the columns you wanted.
+
+### `mutate()`
+
+The table above is more interpretable, but ms is not a super helpful to interpret the length of the song. Let's convert to minutes using `mutate()`
+
+```{r}
+taylor_album_songs %>%
+  filter(!is.na(featuring)) %>%
+  select(album_name, featuring, duration_ms, acousticness) %>%
+  mutate(duration_min = duration_ms/1000/60) %>% #convert to minutes
+  select(-duration_ms) #no longer need the ms version
+```
+
+### `group_by()` and `summarize()`
+
+Say we wanted to assess the average "danceability" of Taylor Swift albums. We do this for all albums using `summarize()`
+
+```{r}
+#To assess the mean across the entire dataset
+taylor_album_songs %>%
+  summarize(mean_danceability = mean(danceability, na.rm = T))
+```
+
+Or we could group by album to get album specific means. Here, I am also using `arrange()` to sort by mean danceability
+
+```{r}
+#To assess the mean within each album
+taylor_album_songs %>%
+  group_by(album_name) %>%
+  summarize(mean_danceability = mean(danceability, na.rm = T)) %>%
+  arrange(mean_danceability) #use arrange to sort by danceability
+```
+
+We can also add another column in our summarize call. For example, it would be helpful to have a sense of the variation around these means:
+```{r}
+taylor_album_songs %>%
+  group_by(album_name) %>%
+  summarize(mean_danceability = mean(danceability, na.rm = T),
+            sd_danceability = sd(danceability, na.rm = T)) %>% #this is the only line we are changing
+  arrange(mean_danceability)
+```
+
+You can also pair `group_by()` with `mutate()` to keep the dataframe the same length, while running calculations within a group
+
+```{r}
+z_score <- function(x){
+  score <- (x - mean(x, na.rm = T))/sd(x, na.rm = T)
+  return(score)
+}
+
+#To assess the mean within each album
+taylor_album_songs %>%
+  group_by(album_name) %>%
+  mutate(z_danceability = z_score(danceability)) %>% #this calculates z_score within each album
+  select(album_name, track_name, z_danceability)
+```
+
+## ggplot2
+
+Another key feature of the tidyverse is the plotting capabilities. "ggplots" are easy to make with a consistent syntax. Let's break down the structure of a ggplot:
+
+Step 1: create the plot with `ggplot()`
+
+```{r}
+taylor_album_songs %>% 
+  ggplot() #creates an empty plot
+```
+
+Step 2: add "aesthetics" (axes, color scales, etc).
+
+```{r}
+taylor_album_songs %>%
+  #ggplot(aes(x = ___, y = ___))
+```
+
+Step 3: Add data to the plot!
+
+Within ggplot, we use the plus sign to add new elements to the plot
+
+```{r}
+taylor_album_songs %>%
+  #ggplot(aes(x = ___, y = ___))+
+  geom_point()
+```
+
+Step 4: Customize!
+
+More resources available here: http://www.sthda.com/english/articles/32-r-graphics-essentials/125-ggplot-cheat-sheet-for-great-customization/
+
+```{r}
+taylor_album_songs %>%
+  #ggplot(aes(x = ___, y = ___))+
+  geom_point() +
+  xlab() +
+  ylab() +
+  theme_bw()
+```
+
+## Combining data analysis with ggplot
+
+```{r}
+# Danceability means and sd calculated above
+dance_means <- taylor_album_songs %>%
+  group_by(album_name) %>%
+  summarize(mean_danceability = mean(danceability, na.rm = T),
+            sd_danceability = sd(danceability, na.rm = T)) %>% #this is the only line we are changing
+  arrange(mean_danceability) 
+
+# Generate plot
+dance_means %>%
+  ggplot(aes(y = album_name, x = mean_danceability))+
+  geom_point() +
+  geom_errorbar(aes(xmin = mean_danceability - sd_danceability, 
+                    xmax = mean_danceability + sd_danceability))
+```
+
+### Adding color
+
+Let's explore how valence, energy, and danceability are related. First we'll plot valence vs energy, then add danceability as color
+
+```{r}
+taylor_album_songs %>%
+  ggplot(aes(x = valence, y = energy)) +
+  geom_point(aes(color = danceability))
+
+# The taylor package also provides taylor-themed colors
+taylor_album_songs %>%
+  ggplot(aes(x = valence, y = energy)) +
+  geom_point(aes(color = danceability)) + 
+  scale_color_taylor_c(album = "midnights")
+  #scale_color_taylor_c(album = "Lover")
+```
+
+### Small multiples
+
+Part of the power of ggplot is that it makes it really easy to add "small multiples" --> separate panels that break your data down into manageable chunks. You do this using `facet_wrap()` and `facet_grid()`
+
+```{r}
+taylor_album_songs %>%
+  ggplot(aes(x = valence, y = energy)) +
+  geom_point(aes(color = danceability)) + 
+  scale_color_taylor_c(album = "1989") +
+  #tilda says you want to divide by album name
+  facet_wrap(~album_name)
+```
+
+By breaking the data down in this way we can see that the positive relationship between valence and energy is fairly consistent across all albums.
+
+### Joins (`full_join()`, `left_join()`, `right_join()`)
+
+Let's add the data from `taylor_albums` to assess whether danceability affects how the album is rated
+
+First, look at the data
+
+```{r}
+taylor_albums
+```
+
+Then, add album info to summary stats and plot
+
+```{r}
+# Danceability means and sd calculated above
+dance_means <- taylor_album_songs %>%
+  group_by(album_name) %>%
+  summarize(mean_danceability = mean(danceability, na.rm = T),
+            sd_danceability = sd(danceability, na.rm = T)) %>% #this is the only line we are changing
+  arrange(mean_danceability) 
+
+# Join album info by album name (this is new)
+dance_mean_plot <- dance_means %>%
+  left_join(taylor_albums, by = "album_name")
+
+# Generate plot
+dance_mean_plot %>%
+  ggplot(aes(y = user_score, x = mean_danceability))+
+  geom_point() +
+  geom_errorbar(aes(xmin = mean_danceability - sd_danceability, 
+                    xmax = mean_danceability + sd_danceability))
+```
+
+### Lyrics
+
+The final column of data includes tibbles with the words to each song. Let's use these lyrics to identify relevant songs to play in class (i.e., songs that contain words like "plot", "data", etc., which are guaranteed to be hits)
+
+First, look at the data
+
+```{r}
+taylor_album_songs$lyrics[[1]] #First song, for example
+```
+
+We can calculate the number of lyrics in which a given word appears using grepl
+
+```{r}
+lyrics_df <- taylor_album_songs$lyrics[[1]] #isolate the df we are working with 
+#grepl searches for this string in the lyrics column
+n_times <- sum(grepl("data|plot|chart|graph|number|analysis|code", lyrics_df$lyric))
+n_times
+```
+
+We now need to do this for all songs, so let's turn this into a function and incorporate into our tidy data analysis
+
+```{r}
+# Function to find the # of times a given word is used in multiple dataframes of lyrics
+find_word <- function(lyric_df_list, word){
+  output <- numeric(length(lyric_df_list))
+  for(i in 1:length(lyric_df_list)){
+    lyrics_df <- lyric_df_list[[i]]
+    n_times <- sum(grepl(word, lyrics_df$lyric))
+    output[i] <- n_times
+  }
+  return(output)
+}
+
+taylor_album_songs %>%
+  mutate(n_relevant = find_word(lyrics, "data|plot|chart|graph|number|analysis|code")) %>%
+  arrange(-n_relevant) %>%
+  filter(n_relevant > 0)
+```
+
+Success! We now have a class playlist!
+
+We can use this same function to identify other text. For example, how often do different colors show up in the lyrics?
+
+```{r}
+taylor_album_songs %>%
+  mutate(n_red = find_word(lyrics, "red"),
+         n_ora = find_word(lyrics, "orange"),
+         n_yel = find_word(lyrics, "yellow"),
+         n_gre = find_word(lyrics, "green"),
+         n_blu = find_word(lyrics, "blue"),
+         n_pur = find_word(lyrics, "purple"),
+         n_whi = find_word(lyrics, "white"),
+         n_bla = find_word(lyrics, "black"),
+         n_gol = find_word(lyrics, "gold"),
+         n_sil = find_word(lyrics, "silver")) %>%
+  summarize(sum_red = sum(n_red),
+            sum_ora = sum(n_ora),
+            sum_yel = sum(n_yel),
+            sum_gre = sum(n_gre),
+            sum_blu = sum(n_blu),
+            sum_pur = sum(n_pur),
+            sum_whi = sum(n_whi),
+            sum_bla = sum(n_bla),
+            sum_gol = sum(n_gol),
+            sum_sil = sum(n_sil))
+```
+
+If we wanted to graph the relative frequency of these words, we would need all x-axis information (i.e., color names) to be in one column. We can do that using `pivot_longer()`
+
+```{r}
+colors_pivot <- taylor_album_songs %>%
+  mutate(red = find_word(lyrics, "red"),
+         orange = find_word(lyrics, "orange"),
+         yelllow = find_word(lyrics, "yellow"),
+         green = find_word(lyrics, "green"),
+         blue = find_word(lyrics, "blue"),
+         purple = find_word(lyrics, "purple"),
+         white = find_word(lyrics, "white"),
+         black = find_word(lyrics, "black"),
+         gold = find_word(lyrics, "gold"),
+         silver = find_word(lyrics, "silver")) %>%
+  pivot_longer(cols = red:silver, names_to = "color", values_to = "n")
+
+colors_pivot %>%
+  ggplot(aes(x = color, y = n)) +
+  geom_col()
+```
+
+### Plot customization
+
+Let's use `scale_fill_manual()` to color each bar according to the color name
+
+```{r}
+colors_pivot %>%
+  ggplot(aes(x = color, y = n, fill = color)) +
+  geom_col() +
+  scale_fill_manual(breaks = c("red", "orange", "yellow", "green", "blue", "purple", "white", "black", "gold", "silver"),
+                    values = c("red", "orange", "yellow", "green", "blue", "purple", "white", "black", "gold", "grey"))
+```
+
+
+# Activity
+
+The rest of the class period is yours to explore data analysis and visualization with the Taylor Swift data. If you are new to tidyverse and ggplot you can reference the techniques throughout this document. If you are already proficient in these techniques, I recommend checking out other resources including the the `ggh4x` package (https://cran.rstudio.com/web/packages/ggh4x/index.html), the `gg_plotly()` function from the `plotly` library, and `gganimate` (https://gganimate.com/) to explore new skills. 
+
+You can find inspiration from recently-shared posts here:
+https://twitter.com/hashtag/TidyTuesday?src=hashtag_click&f=live
+
+I'm excited to see what you develop!
+
+Ideas to get you started:
+* How have album ratings changed over time?
+* How has the use of certain words changed over time?
+* Does the key of the music relate to the energy rating? Or other properties of the song?
+* Are there distinctive traits about the first or last track in each album?
+
+```{r}
+taylor_album_songs
+taylor_albums
+```
+
