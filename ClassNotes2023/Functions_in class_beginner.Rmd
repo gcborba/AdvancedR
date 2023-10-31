@@ -1,0 +1,87 @@
+---
+title: "Functions_2"
+author: "Abby Lewis"
+date: "2023-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exercises
+
+### Beginner
+
+1. What are the three important components of a function?
+
+Formals are the list of arguments that control how you call the function
+
+The body is the code within the function
+
+The environment is the data structure that determines how the function finds the values associated with the name
+
+2. Write a function to calculate the z-score of a vector, where the z-score is 
+(value - mean)/sd
+
+```{r}
+z <- c(10, 20, 30, 40, 50)
+mean_z <- mean(z)
+sd_z <- sd(z)
+
+#' Title
+#'
+#' @param z c(10, 20, 30, 40, 50)
+#'
+#' @return z scores for vector "z"
+#' @export
+#'
+#' @examples see below
+
+score <- function(z) {
+  (z-mean_z)/sd_z
+}
+
+score(10)
+```
+
+3. Add documentation to your function in the `roxygen2` format
+
+### Intermediate
+
+`map(1:3, ~ runif(2))` is a useful pattern for generating random numbers, but `map(1:3, runif(2))` is not. Why not? Can you explain why it returns the result that it does?
+
+```{r}
+map(1:3, ~ runif(2))
+map(1:3, runif(2))
+```
+
+2. Create infix versions of the set functions `intersect()`, `union()`, and `setdiff()`. You might call them `%n%`, `%u%`, and `%/%` to match conventions from mathematics.
+
+```{r}
+
+```
+
+
+### Advanced
+
+1.  Use `map()` to fit linear models to the `mtcars` dataset using the formulas stored in this list:
+
+```{r}
+formulas <- list(
+  mpg ~ disp,
+  mpg ~ I(1 / disp),
+  mpg ~ disp + wt,
+  mpg ~ I(1 / disp) + wt
+)
+```
+
+2. Rewrite the following code snippets into prefix form:
+
+```{r, eval = FALSE}
+1 + 2 + 3
+
+1 + (2 * 3)
+
+if (length(x) <= 5) x[[5]] else x[[n]]
+```
